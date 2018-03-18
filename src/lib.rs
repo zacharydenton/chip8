@@ -1,17 +1,17 @@
 pub struct Chip8 {
+    pub i: usize,
     pub pc: usize,
     pub sp: usize,
-    pub op: u16,
+    pub stack: [usize; 32],
     pub registers: [u8; 16],
     pub memory: [u8; 4096],
     pub graphics: [u8; 64 * 32],
-    pub stack: [usize; 32],
 }
 
 impl Chip8 {
     pub fn new() -> Self {
         let mut chip8 = Chip8 {
-            op: 0,
+            i: 0,
             pc: 0x200,
             sp: 0,
             registers: [0; 16],
@@ -36,7 +36,6 @@ impl Chip8 {
         // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
         // 0xFX15: Set timer = VX (0x01 = 1/60 second)
         // 0xFX18: Set tone duration = VX (0x01 = 1/60 second)
-        // 0xAMMM: Let I = 0x0MMM
         // 0xFX1E: Let I = I + VX
         // 0xFX29: Let I = 5 byte display pattern for LSD of VX
         // 0xFX33: Let MI = 3 decimal digit equivalent of VX (I unchanged)
@@ -50,18 +49,18 @@ impl Chip8 {
         match self.fetch_op() {
             (0x1, a, b, c) => {
                 // 0x1MMM: Go to 0x0MMM
-                let mmm: usize = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
+                let mmm = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
                 self.go_to(mmm);
             }
             (0xB, a, b, c) => {
                 // 0xBMMM: Go to 0x0MMM + V0
-                let mmm: usize = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
-                let v0: usize = self.registers[0] as usize;
+                let mmm = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
+                let v0 = self.registers[0] as usize;
                 self.go_to(mmm + v0);
             }
             (0x2, a, b, c) => {
                 // 0x2MMM: Do subroutine at 0x0MMM (must end with 0x00EE)
-                let mmm: usize = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
+                let mmm = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
                 self.stack[self.sp] = self.pc;
                 self.sp += 1;
                 self.go_to(mmm);
@@ -146,6 +145,12 @@ impl Chip8 {
                 let r = vx.wrapping_sub(vy);
                 self.registers[x as usize] = r;
                 self.registers[0xF] = if vx < vy { 0 } else { 1 };
+                self.next();
+            }
+            (0xA, a, b, c) => {
+                // 0xAMMM: Let I = 0x0MMM
+                let mmm = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
+                self.i = mmm;
                 self.next();
             }
             (a, b, c, d) => {
@@ -378,6 +383,8 @@ mod tests {
         chip8.cycle();
         assert!(chip8.registers[0x3] == 0x39 + 0x0D);
         assert!(chip8.registers[0xF] == 0);
+
+        // Overflow should wrap around.
         chip8.pc = 0x200;
         chip8.registers[0x4] = 0xFF;
         chip8.cycle();
@@ -395,11 +402,22 @@ mod tests {
         chip8.cycle();
         assert!(chip8.registers[0x3] == 0x39 - 0x0D);
         assert!(chip8.registers[0xF] == 1);
+
+        // Overflow should wrap around.
         chip8.pc = 0x200;
         chip8.registers[0x4] = 0xFF;
         chip8.cycle();
         assert!(chip8.registers[0x3] == (0x39 - 0x0D) + 1);
         assert!(chip8.registers[0xF] == 0);
+    }
+
+    #[test]
+    fn op_ammm() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0xA9;
+        chip8.memory[0x201] = 0x08;
+        chip8.cycle();
+        assert!(chip8.i == 0x908);
     }
 
     #[test]
