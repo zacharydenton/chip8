@@ -31,7 +31,6 @@ impl Chip8 {
     pub fn cycle(&mut self) {
         // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
         // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
-        // 0x6XKK: Let VX = KK
         // 0xCXKK: Let VX = Random Byte (KK = Mask)
         // 0x7XKK: Let VX = VX + KK
         // 0x8XY0: Let VX = VY
@@ -82,36 +81,32 @@ impl Chip8 {
             (0x3, x, a, b) => {
                 // 0x3XKK: Skip next instruction if VX = KK
                 let kk = (a << 4) + b;
-                if self.registers[x as usize] == kk {
-                    self.pc += 4;
-                } else {
-                    self.pc += 2;
-                }
+                let vx = self.registers[x as usize];
+                self.skip_if(vx == kk);
             }
             (0x4, x, a, b) => {
                 // 0x4XKK: Skip next instruction if VX != KK
                 let kk = (a << 4) + b;
-                if self.registers[x as usize] != kk {
-                    self.pc += 4;
-                } else {
-                    self.pc += 2;
-                }
+                let vx = self.registers[x as usize];
+                self.skip_if(vx != kk);
             }
             (0x5, x, y, 0x0) => {
                 // 0x5XY0: Skip next instruction if VX = VY
-                if self.registers[x as usize] == self.registers[y as usize] {
-                    self.pc += 4;
-                } else {
-                    self.pc += 2;
-                }
+                let vx = self.registers[x as usize];
+                let vy = self.registers[y as usize];
+                self.skip_if(vx == vy);
             }
             (0x9, x, y, 0x0) => {
                 // 0x9XY0: Skip next instruction if VX != VY
-                if self.registers[x as usize] != self.registers[y as usize] {
-                    self.pc += 4;
-                } else {
-                    self.pc += 2;
-                }
+                let vx = self.registers[x as usize];
+                let vy = self.registers[y as usize];
+                self.skip_if(vx != vy);
+            }
+            (0x6, x, a, b) => {
+                // 0x6XKK: Let VX = KK
+                let kk = (a << 4) + b;
+                self.registers[x as usize] = kk;
+                self.next();
             }
             (a, b, c, d) => {
                 panic!(
@@ -133,6 +128,18 @@ impl Chip8 {
 
     fn go_to(&mut self, address: usize) {
         self.pc = address;
+    }
+
+    fn next(&mut self) {
+        self.pc += 2;
+    }
+
+    fn skip_if(&mut self, condition: bool) {
+        if condition {
+            self.pc += 4;
+        } else {
+            self.pc += 2;
+        }
     }
 }
 
@@ -262,6 +269,15 @@ mod tests {
         chip8.registers[0xA] = 0xFF;
         chip8.cycle();
         assert!(chip8.pc == 0x202);
+    }
+
+    #[test]
+    fn op_6xkk() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0x68;
+        chip8.memory[0x201] = 0x42;
+        chip8.cycle();
+        assert!(chip8.registers[0x8] == 0x42);
     }
 
     #[test]
