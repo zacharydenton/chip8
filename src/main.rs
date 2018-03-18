@@ -1,8 +1,8 @@
 extern crate chip8;
 use chip8::Chip8;
 
-#[macro_use]
 extern crate glium;
+extern crate rand;
 
 fn render(chip8: &Chip8, framebuffer: &mut [u8]) {
     for x in 0..64 {
@@ -24,6 +24,7 @@ fn main() {
     let context = glutin::ContextBuilder::new();
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
+    let mut rng = rand::thread_rng();
     let mut chip8 = Chip8::new();
 
     // Set V2 = rocket X coordinate = 0x00;
@@ -59,7 +60,7 @@ fn main() {
         let mut framebuffer: Vec<u8> = vec![0; 3 * chip8.graphics.len()];
         render(&chip8, &mut framebuffer);
 
-        let mut image = glium::texture::RawImage2d::from_raw_rgb(framebuffer, (64, 32));
+        let image = glium::texture::RawImage2d::from_raw_rgb(framebuffer, (64, 32));
         let texture = glium::Texture2d::new(&display, image).unwrap();
         let surface = texture.as_surface();
 
@@ -75,6 +76,6 @@ fn main() {
             _ => (),
         });
 
-        chip8.cycle();
+        chip8.cycle(&mut rng);
     }
 }

@@ -1,3 +1,6 @@
+extern crate rand;
+use rand::Rng;
+
 pub struct Chip8 {
     pub i: usize,
     pub pc: usize,
@@ -8,7 +11,7 @@ pub struct Chip8 {
     pub graphics: [u8; 64 * 32],
 }
 
-impl Chip8 {
+impl<'a> Chip8 {
     pub fn new() -> Self {
         let mut chip8 = Chip8 {
             i: 0,
@@ -28,10 +31,9 @@ impl Chip8 {
         chip8
     }
 
-    pub fn cycle(&mut self) {
+    pub fn cycle<R: Rng>(&mut self, rng: &'a mut R) {
         // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
         // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
-        // 0xCXKK: Let VX = Random Byte (KK = Mask)
         // 0xFX07: Let VX = current timer value
         // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
         // 0xFX15: Set timer = VX (0x01 = 1/60 second)
@@ -136,6 +138,13 @@ impl Chip8 {
                 let r = vx.wrapping_sub(vy);
                 self.registers[x as usize] = r;
                 self.registers[0xF] = if vx < vy { 0 } else { 1 };
+                self.next();
+            }
+            (0xC, x, a, b) => {
+                // 0xCXKK: Let VX = Random Byte (KK = Mask)
+                let kk = (a << 4) + b;
+                let rb: u8 = rng.gen();
+                self.registers[x as usize] = rb & kk;
                 self.next();
             }
             (0xA, a, b, c) => {
@@ -293,115 +302,124 @@ mod tests {
     #[test]
     fn op_1mmm() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x13;
         chip8.memory[0x201] = 0x5F;
         chip8.memory[0x35F] = 0x12;
         chip8.memory[0x35F + 1] = 0x00;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x35F);
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x200);
     }
 
     #[test]
     fn op_bmmm() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0xB3;
         chip8.memory[0x201] = 0x00;
         chip8.registers[0] = 0xF0;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x300 + 0xF0);
     }
 
     #[test]
     fn op_3xkk() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x33;
         chip8.memory[0x201] = 0x42;
         chip8.registers[3] = 0x41;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x202);
         chip8.pc = 0x200;
         chip8.registers[3] = 0x42;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x204);
     }
 
     #[test]
     fn op_4xkk() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x4F;
         chip8.memory[0x201] = 0xF0;
         chip8.registers[0xF] = 0xF0;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x202);
         chip8.pc = 0x200;
         chip8.registers[0xF] = 0x42;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x204);
     }
 
     #[test]
     fn op_5xy0() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x50;
         chip8.memory[0x201] = 0xB0;
         chip8.registers[0] = 0x33;
         chip8.registers[0xB] = 0x23;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x202);
         chip8.pc = 0x200;
         chip8.registers[0xB] = 0x33;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x204);
     }
 
     #[test]
     fn op_9xy0() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x9C;
         chip8.memory[0x201] = 0xA0;
         chip8.registers[0xC] = 0xFF;
         chip8.registers[0xA] = 0xEE;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x204);
         chip8.pc = 0x200;
         chip8.registers[0xA] = 0xFF;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x202);
     }
 
     #[test]
     fn op_6xkk() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x68;
         chip8.memory[0x201] = 0x42;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.registers[0x8] == 0x42);
     }
 
     #[test]
     fn op_7xkk() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x7A;
         chip8.memory[0x201] = 0x10;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.registers[0xA] == 0x10);
 
         // Overflow should wrap around.
         chip8.pc = 0x200;
         chip8.memory[0x201] = 0xFF;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.registers[0xA] == 0x10 - 1);
     }
 
     #[test]
     fn op_8xy0() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x8A;
         chip8.memory[0x201] = 0xB0;
         chip8.registers[0xB] = 0xF0;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.registers[0xA] == 0xF0);
         assert!(chip8.registers[0xB] == 0xF0);
     }
@@ -409,40 +427,43 @@ mod tests {
     #[test]
     fn op_8xy1() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x83;
         chip8.memory[0x201] = 0x41;
         chip8.registers[0x3] = 0x39;
         chip8.registers[0x4] = 0xCD;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.registers[0x3] == 0x39 | 0xCD);
     }
 
     #[test]
     fn op_8xy2() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x83;
         chip8.memory[0x201] = 0x42;
         chip8.registers[0x3] = 0x39;
         chip8.registers[0x4] = 0xCD;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.registers[0x3] == 0x39 & 0xCD);
     }
 
     #[test]
     fn op_8xy4() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x83;
         chip8.memory[0x201] = 0x44;
         chip8.registers[0x3] = 0x39;
         chip8.registers[0x4] = 0x0D;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.registers[0x3] == 0x39 + 0x0D);
         assert!(chip8.registers[0xF] == 0);
 
         // Overflow should wrap around.
         chip8.pc = 0x200;
         chip8.registers[0x4] = 0xFF;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.registers[0x3] == (0x39 + 0x0D) - 1);
         assert!(chip8.registers[0xF] == 1);
     }
@@ -450,18 +471,19 @@ mod tests {
     #[test]
     fn op_8xy5() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x83;
         chip8.memory[0x201] = 0x45;
         chip8.registers[0x3] = 0x39;
         chip8.registers[0x4] = 0x0D;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.registers[0x3] == 0x39 - 0x0D);
         assert!(chip8.registers[0xF] == 1);
 
         // Overflow should wrap around.
         chip8.pc = 0x200;
         chip8.registers[0x4] = 0xFF;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.registers[0x3] == (0x39 - 0x0D) + 1);
         assert!(chip8.registers[0xF] == 0);
     }
@@ -469,30 +491,33 @@ mod tests {
     #[test]
     fn op_ammm() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0xA9;
         chip8.memory[0x201] = 0x08;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.i == 0x908);
     }
 
     #[test]
     fn op_fx1e() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0xF4;
         chip8.memory[0x201] = 0x1E;
         chip8.i = 0x500;
         chip8.registers[4] = 0x20;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.i == 0x500 + 0x20);
     }
 
     #[test]
     fn op_fx29() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0xFC;
         chip8.memory[0x201] = 0x29;
         chip8.registers[0xC] = 0x0A;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         for i in 0..5 {
             assert!(chip8.memory[chip8.i + i] == FONTS[(5 * 0xA) + i]);
         }
@@ -500,7 +525,7 @@ mod tests {
         chip8.memory[0x200] = 0xFC;
         chip8.memory[0x201] = 0x29;
         chip8.registers[0xC] = 0xD1;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         for i in 0..5 {
             assert!(chip8.memory[chip8.i + i] == FONTS[(5 * 0x1) + i]);
         }
@@ -509,23 +534,24 @@ mod tests {
     #[test]
     fn op_fx33() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0xF1;
         chip8.memory[0x201] = 0x33;
         chip8.registers[1] = 243;
         chip8.i = 0x500;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.memory[chip8.i + 0] == 2);
         assert!(chip8.memory[chip8.i + 1] == 4);
         assert!(chip8.memory[chip8.i + 2] == 3);
         chip8.pc = 0x200;
         chip8.registers[1] = 91;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.memory[chip8.i + 0] == 0);
         assert!(chip8.memory[chip8.i + 1] == 9);
         assert!(chip8.memory[chip8.i + 2] == 1);
         chip8.pc = 0x200;
         chip8.registers[1] = 5;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.memory[chip8.i + 0] == 0);
         assert!(chip8.memory[chip8.i + 1] == 0);
         assert!(chip8.memory[chip8.i + 2] == 5);
@@ -534,13 +560,14 @@ mod tests {
     #[test]
     fn op_fx55() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0xF7;
         chip8.memory[0x201] = 0x55;
         for i in 0..8 {
             chip8.registers[i] = 200 + (i as u8);
         }
         chip8.i = 0x450;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         for i in 0..8 {
             assert!(chip8.memory[0x450 + i] == 200 + (i as u8));
         }
@@ -549,13 +576,14 @@ mod tests {
     #[test]
     fn op_fx65() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0xFE;
         chip8.memory[0x201] = 0x65;
         chip8.i = 0x600;
         for i in 0..0xF {
             chip8.memory[chip8.i + i] = 33 + (4 * i as u8);
         }
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         for i in 0..8 {
             assert!(chip8.registers[i] == 33 + (4 * i as u8));
         }
@@ -564,12 +592,13 @@ mod tests {
     #[test]
     fn op_00e0() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x00;
         chip8.memory[0x201] = 0xE0;
         for i in 0..chip8.graphics.len() {
             chip8.graphics[i] = 1;
         }
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         for i in 0..chip8.graphics.len() {
             assert!(chip8.graphics[i] == 0);
         }
@@ -578,6 +607,7 @@ mod tests {
     #[test]
     fn op_dxyn() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0xD4;
         chip8.memory[0x201] = 0x55;
         chip8.registers[4] = 10;
@@ -586,7 +616,7 @@ mod tests {
         for i in 0..5 {
             chip8.memory[chip8.i + i] = 0xFF;
         }
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         for x in 0..8 {
             for y in 0..5 {
                 assert!(chip8.graphics[64 * (12 + y) + (10 + x)] == 1);
@@ -594,7 +624,7 @@ mod tests {
         }
         assert!(chip8.registers[0xF] == 0);
         chip8.pc = 0x200;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         for x in 0..8 {
             for y in 0..5 {
                 assert!(chip8.graphics[64 * (12 + y) + (10 + x)] == 0);
@@ -603,7 +633,7 @@ mod tests {
         assert!(chip8.registers[0xF] == 1);
         chip8.registers[4] = 18;
         chip8.pc = 0x200;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         for x in 0..8 {
             for y in 0..5 {
                 assert!(chip8.graphics[64 * (12 + y) + (18 + x)] == 1);
@@ -613,17 +643,35 @@ mod tests {
     }
 
     #[test]
+    fn op_cxkk() {
+        let mut chip8 = Chip8::new();
+        let mut rng = rand::chacha::ChaChaRng::new_unseeded();
+        chip8.memory[0x200] = 0xC3;
+        chip8.memory[0x201] = 0xFF;
+        chip8.cycle(&mut rng);
+        assert!(chip8.registers[3] == 118);
+        chip8.pc = 0x200;
+        chip8.cycle(&mut rng);
+        assert!(chip8.registers[3] == 160);
+        chip8.pc = 0x200;
+        chip8.memory[0x201] = 0x00;
+        chip8.cycle(&mut rng);
+        assert!(chip8.registers[3] == 0);
+    }
+
+    #[test]
     fn subroutines() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x25;
         chip8.memory[0x201] = 0x00;
         chip8.memory[0x500] = 0x00;
         chip8.memory[0x501] = 0xEE;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x500);
         assert!(chip8.sp == 1);
         assert!(chip8.stack[0] == 0x200);
-        chip8.cycle();
+        chip8.cycle(&mut rng);
         assert!(chip8.pc == 0x202);
         assert!(chip8.sp == 0);
     }
@@ -632,8 +680,9 @@ mod tests {
     #[should_panic]
     fn op_unsupported() {
         let mut chip8 = Chip8::new();
+        let mut rng = rand::thread_rng();
         chip8.memory[0x200] = 0x00;
         chip8.memory[0x201] = 0x00;
-        chip8.cycle();
+        chip8.cycle(&mut rng);
     }
 }
