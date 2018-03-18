@@ -31,6 +31,24 @@ impl<'a> Chip8 {
         chip8
     }
 
+    pub fn load(&mut self, program: &[u8]) {
+        self.i = 0;
+        self.pc = 0x200;
+        self.sp = 0;
+        for i in 0..self.registers.len() {
+            self.registers[i] = 0;
+        }
+        for i in 0..self.stack.len() {
+            self.stack[i] = 0;
+        }
+        for i in 0..program.len() {
+            self.memory[self.pc + i] = program[i];
+        }
+        for i in 0..self.graphics.len() {
+            self.graphics[i] = 0;
+        }
+    }
+
     pub fn cycle<R: Rng>(&mut self, rng: &'a mut R) {
         // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
         // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)

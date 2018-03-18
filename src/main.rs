@@ -27,33 +27,26 @@ fn main() {
     let mut rng = rand::thread_rng();
     let mut chip8 = Chip8::new();
 
-    // Set V2 = rocket X coordinate = 0x00;
-    chip8.memory[0x200] = 0x62;
-    chip8.memory[0x201] = 0x00;
-
-    // Set V3 = rocket Y coordinate = 0x00;
-    chip8.memory[0x202] = 0x63;
-    chip8.memory[0x203] = 0x00;
-
-    // Set I = rocket pattern address = 0x020A;
-    chip8.memory[0x204] = 0xA2;
-    chip8.memory[0x205] = 0x0A;
-
-    // Display 6 byte rocket pattern.
-    chip8.memory[0x206] = 0xD2;
-    chip8.memory[0x207] = 0x36;
-
-    // Loop forever (goto 0x208).
-    chip8.memory[0x208] = 0x12;
-    chip8.memory[0x209] = 0x08;
-
-    // Rocket pattern.
-    chip8.memory[0x20A] = 0x20;
-    chip8.memory[0x20B] = 0x70;
-    chip8.memory[0x20C] = 0x70;
-    chip8.memory[0x20D] = 0xF8;
-    chip8.memory[0x20E] = 0xD8;
-    chip8.memory[0x20F] = 0x88;
+    let program: Vec<u8> = vec![
+      // Set V2 = rocket X coordinate = 0x00;
+      0x62, 0x00,
+      // Set V3 = rocket Y coordinate = 0x00;
+      0x63, 0x00,
+      // Set I = rocket pattern address = 0x020A;
+      0xA2, 0x0A,
+      // Display 6 byte rocket pattern.
+      0xD2, 0x36,
+      // Loop forever (goto 0x208).
+      0x12, 0x08,
+      // Rocket pattern.
+      0x20,
+      0x70,
+      0x70,
+      0xF8,
+      0xD8,
+      0x88,
+    ];
+    chip8.load(&program);
 
     let mut closed = false;
     while !closed {
