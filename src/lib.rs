@@ -192,6 +192,7 @@ impl Chip8 {
                 // 0xDXYN: Show n byte MI pattern at VX-VY coordinates. I unchanged. MI pattern is
                 // combined with existing display via EXCLUSIVE-OR function. VF = 0x01 if a 1 in MI
                 // pattern matches 1 in existing display.
+                self.registers[0xF] = 0x0;
                 let vx = self.registers[x as usize];
                 let vy = self.registers[y as usize];
                 for i in 0..n {
@@ -596,10 +597,19 @@ mod tests {
         chip8.cycle();
         for x in 0..8 {
             for y in 0..5 {
-                assert!(chip8.graphics[64 * (12 + y) + x] == 0);
+                assert!(chip8.graphics[64 * (12 + y) + (10 + x)] == 0);
             }
         }
         assert!(chip8.registers[0xF] == 1);
+        chip8.registers[4] = 18;
+        chip8.pc = 0x200;
+        chip8.cycle();
+        for x in 0..8 {
+            for y in 0..5 {
+                assert!(chip8.graphics[64 * (12 + y) + (18 + x)] == 1);
+            }
+        }
+        assert!(chip8.registers[0xF] == 0);
     }
 
     #[test]
