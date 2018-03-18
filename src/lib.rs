@@ -65,7 +65,6 @@ impl<'a> Chip8 {
         // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
         // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
         // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
-        // 0xFX18: Set tone duration = VX (0x01 = 1/60 second)
         // 0x0MMM: Do machine language at 0x0MMM (subroutine must end with 0xD4 byte)
         match self.fetch_op() {
             (0x1, a, b, c) => {
@@ -254,6 +253,12 @@ impl<'a> Chip8 {
                 // 0xFX15: Set timer = VX (0x01 = 1/60 second)
                 let vx = self.registers[x as usize];
                 self.delay_timer = vx;
+                self.next();
+            }
+            (0xF, x, 0x1, 0x8) => {
+                // 0xFX18: Set tone duration = VX (0x01 = 1/60 second)
+                let vx = self.registers[x as usize];
+                self.sound_timer = vx;
                 self.next();
             }
             (a, b, c, d) => {
