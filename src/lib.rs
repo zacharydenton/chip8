@@ -32,7 +32,6 @@ impl Chip8 {
         // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
         // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
         // 0xCXKK: Let VX = Random Byte (KK = Mask)
-        // 0x7XKK: Let VX = VX + KK
         // 0x8XY0: Let VX = VY
         // 0x8XY1: Let VX = VX / VY (VF changed)
         // 0x8XY2: Let VX = VX & VY (VF changed)
@@ -75,8 +74,9 @@ impl Chip8 {
             (0x0, 0x0, 0xE, 0xE) => {
                 // 0x00EE: Return from subroutine
                 self.sp -= 1;
-                let return_address: usize = self.stack[self.sp] + 2;
+                let return_address = self.stack[self.sp];
                 self.go_to(return_address);
+                self.next();
             }
             (0x3, x, a, b) => {
                 // 0x3XKK: Skip next instruction if VX = KK
@@ -106,6 +106,13 @@ impl Chip8 {
                 // 0x6XKK: Let VX = KK
                 let kk = (a << 4) + b;
                 self.registers[x as usize] = kk;
+                self.next();
+            }
+            (0x7, x, a, b) => {
+                // 0x7XKK: Let VX = VX + KK
+                let kk = (a << 4) + b;
+                let vx = self.registers[x as usize];
+                self.registers[x as usize] = vx.wrapping_add(kk);
                 self.next();
             }
             (a, b, c, d) => {
@@ -278,6 +285,21 @@ mod tests {
         chip8.memory[0x201] = 0x42;
         chip8.cycle();
         assert!(chip8.registers[0x8] == 0x42);
+    }
+
+    #[test]
+    fn op_7xkk() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0x7A;
+        chip8.memory[0x201] = 0x10;
+        chip8.cycle();
+        assert!(chip8.registers[0xA] == 0x10);
+
+        // Overflow should wrap around.
+        chip8.pc = 0x200;
+        chip8.memory[0x201] = 0xFF;
+        chip8.cycle();
+        assert!(chip8.registers[0xA] == 0x10 - 1);
     }
 
     #[test]
