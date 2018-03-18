@@ -29,7 +29,6 @@ impl Chip8 {
     }
 
     pub fn cycle(&mut self) {
-        // 0x1MMM: Go to 0x0MMM
         // 0xBMMM: Go to 0x0MMM + V0
         // 0x2MMM: Do subroutine at 0x0MMM (must end with 0x00EE)
         // 0x00EE: Return from subroutine
@@ -62,15 +61,32 @@ impl Chip8 {
         //         with existing display via EXCLUSIVE-OR function. VF = 0x01 if a 1 in MI pattern
         //         matches 1 in existing display.
         // 0x0MMM: Do machine language at 0x0MMM (subroutine must end with 0xD4 byte)
+        match self.fetch_op() {
+            (0x1, a, b, c) => {
+                // 0x1MMM: Go to 0x0MMM
+                let mmm: usize = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
+                self.go_to(mmm);
+            }
+            (a, b, c, d) => {
+                panic!(
+                    "Attempted to execute unsupported instruction: 0x{:X}{:X}{:X}{:X}",
+                    a, b, c, d
+                );
+            }
+        }
     }
 
     fn fetch_op(&self) -> (u8, u8, u8, u8) {
         (
             self.memory[self.pc] >> 4,
-            self.memory[self.pc] & 0x0F,
+            self.memory[self.pc] & 0xF,
             self.memory[self.pc + 1] >> 4,
-            self.memory[self.pc + 1] & 0x0F,
+            self.memory[self.pc + 1] & 0xF,
         )
+    }
+
+    fn go_to(&mut self, address: usize) {
+        self.pc = address;
     }
 }
 
@@ -112,12 +128,34 @@ mod tests {
     #[test]
     fn fetch_op() {
         let mut chip8 = Chip8::new();
-        chip8.memory[0x200] = 0xf0;
+        chip8.memory[0x200] = 0xF0;
         chip8.memory[0x201] = 0x00;
-        chip8.memory[0x202] = 0xd3;
+        chip8.memory[0x202] = 0xD3;
         chip8.memory[0x203] = 0x40;
-        assert!(chip8.fetch_op() == (0xf, 0x0, 0x0, 0x0));
+        assert!(chip8.fetch_op() == (0xF, 0x0, 0x0, 0x0));
         chip8.pc += 2;
-        assert!(chip8.fetch_op() == (0xd, 0x3, 0x4, 0x0));
+        assert!(chip8.fetch_op() == (0xD, 0x3, 0x4, 0x0));
+    }
+
+    #[test]
+    fn op_1mmm() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0x13;
+        chip8.memory[0x201] = 0x5F;
+        chip8.memory[0x35F] = 0x12;
+        chip8.memory[0x35F + 1] = 0x00;
+        chip8.cycle();
+        assert!(chip8.pc == 0x35F);
+        chip8.cycle();
+        assert!(chip8.pc == 0x200);
+    }
+
+    #[test]
+    #[should_panic]
+    fn op_unsupported() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0x00;
+        chip8.memory[0x201] = 0x00;
+        chip8.cycle();
     }
 }
