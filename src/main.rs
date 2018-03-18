@@ -33,7 +33,7 @@ fn main() {
         f.read_to_end(&mut program).expect("Error reading program file.");
         chip8.load(&program);
     } else {
-        let logo = include_bytes!("logo.ch8");
+        let logo = include_bytes!("../data/logo.ch8");
         chip8.load(logo);
     }
 
