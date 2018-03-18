@@ -36,9 +36,6 @@ impl Chip8 {
         // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
         // 0xFX15: Set timer = VX (0x01 = 1/60 second)
         // 0xFX18: Set tone duration = VX (0x01 = 1/60 second)
-        // 0xDXYN: Show n byte MI pattern at VX-VY coordinates. I unchanged. MI pattern is combined
-        //         with existing display via EXCLUSIVE-OR function. VF = 0x01 if a 1 in MI pattern
-        //         matches 1 in existing display.
         // 0x0MMM: Do machine language at 0x0MMM (subroutine must end with 0xD4 byte)
         match self.fetch_op() {
             (0x1, a, b, c) => {
@@ -188,6 +185,25 @@ impl Chip8 {
                 // 0x00E0: Erase display (all 0s)
                 for i in 0..self.graphics.len() {
                     self.graphics[i] = 0;
+                }
+                self.next();
+            }
+            (0xD, x, y, n) => {
+                // 0xDXYN: Show n byte MI pattern at VX-VY coordinates. I unchanged. MI pattern is
+                // combined with existing display via EXCLUSIVE-OR function. VF = 0x01 if a 1 in MI
+                // pattern matches 1 in existing display.
+                let vx = self.registers[x as usize];
+                let vy = self.registers[y as usize];
+                for i in 0..n {
+                    let mi = self.memory[self.i + i as usize];
+                    for j in 0..8 {
+                        let bit = (mi >> (7 - j)) & 1;
+                        let index = 64 * ((vy + i) as usize) + ((vx + j) as usize);
+                        if bit == 1 && self.graphics[index] == 1 {
+                            self.registers[0xF] = 0x1;
+                        }
+                        self.graphics[index] ^= bit;
+                    }
                 }
                 self.next();
             }
@@ -556,6 +572,34 @@ mod tests {
         for i in 0..chip8.graphics.len() {
             assert!(chip8.graphics[i] == 0);
         }
+    }
+
+    #[test]
+    fn op_dxyn() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0xD4;
+        chip8.memory[0x201] = 0x55;
+        chip8.registers[4] = 10;
+        chip8.registers[5] = 12;
+        chip8.i = 0x500;
+        for i in 0..5 {
+            chip8.memory[chip8.i + i] = 0xFF;
+        }
+        chip8.cycle();
+        for x in 0..8 {
+            for y in 0..5 {
+                assert!(chip8.graphics[64 * (12 + y) + (10 + x)] == 1);
+            }
+        }
+        assert!(chip8.registers[0xF] == 0);
+        chip8.pc = 0x200;
+        chip8.cycle();
+        for x in 0..8 {
+            for y in 0..5 {
+                assert!(chip8.graphics[64 * (12 + y) + x] == 0);
+            }
+        }
+        assert!(chip8.registers[0xF] == 1);
     }
 
     #[test]
