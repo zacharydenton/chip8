@@ -1,7 +1,7 @@
 pub struct Chip8 {
-    pub pc: u16,
+    pub pc: usize,
+    pub sp: usize,
     pub op: u16,
-    pub sp: u16,
     pub registers: [u8; 16],
     pub stack: [u8; 32],
     pub memory: [u8; 4096],
@@ -26,6 +26,51 @@ impl Chip8 {
         }
 
         chip8
+    }
+
+    pub fn cycle(&mut self) {
+        // 0x1MMM: Go to 0x0MMM
+        // 0xBMMM: Go to 0x0MMM + V0
+        // 0x2MMM: Do subroutine at 0x0MMM (must end with 0x00EE)
+        // 0x00EE: Return from subroutine
+        // 0x3XKK: Skip next instruction if VX = KK
+        // 0x4XKK: Skip next instruction if VX != KK
+        // 0x5XY0: Skip next instruction if VX = VY
+        // 0x9XY0: Skip next instruction if VX != VY
+        // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
+        // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
+        // 0x6XKK: Let VX = KK
+        // 0xCXKK: Let VX = Random Byte (KK = Mask)
+        // 0x7XKK: Let VX = VX + KK
+        // 0x8XY0: Let VX = VY
+        // 0x8XY1: Let VX = VX / VY (VF changed)
+        // 0x8XY2: Let VX = VX & VY (VF changed)
+        // 0x8XY4: Let VX = VX + VY (VF = 0x00 if VX + VY <= 0xFF, VF = 0x01 if VX + VY > 0xFF)
+        // 0x8XY5: Let VX = VX - VY (VF = 0x00 if VX < VY, VF = 0x01 if VX >= VY)
+        // 0xFX07: Let VX = current timer value
+        // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
+        // 0xFX15: Set timer = VX (0x01 = 1/60 second)
+        // 0xFX18: Set tone duration = VX (0x01 = 1/60 second)
+        // 0xAMMM: Let I = 0x0MMM
+        // 0xFX1E: Let I = I + VX
+        // 0xFX29: Let I = 5 byte display pattern for LSD of VX
+        // 0xFX33: Let MI = 3 decimal digit equivalent of VX (I unchanged)
+        // 0xFX55: Let MI = V0 : VX (I = I + X + 1)
+        // 0xFX65: Let V0 : VX = MI (I = I + X + 1)
+        // 0x00E0: Erase display (all 0s)
+        // 0xDXYN: Show n byte MI pattern at VX-VY coordinates. I unchanged. MI pattern is combined
+        //         with existing display via EXCLUSIVE-OR function. VF = 0x01 if a 1 in MI pattern
+        //         matches 1 in existing display.
+        // 0x0MMM: Do machine language at 0x0MMM (subroutine must end with 0xD4 byte)
+    }
+
+    fn fetch_op(&self) -> (u8, u8, u8, u8) {
+        (
+            self.memory[self.pc] >> 4,
+            self.memory[self.pc] & 0x0F,
+            self.memory[self.pc + 1] >> 4,
+            self.memory[self.pc + 1] & 0x0F,
+        )
     }
 }
 
@@ -57,9 +102,22 @@ mod tests {
         let chip8 = Chip8::new();
         assert!(chip8.memory.len() == 4096);
         assert!(chip8.stack.len() == 32);
+        assert!(chip8.registers.len() == 16);
         assert!(chip8.pc == 0x200);
         for i in 0..FONTS.len() {
             assert!(chip8.memory[i] != 0);
         }
+    }
+
+    #[test]
+    fn fetch_op() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0xf0;
+        chip8.memory[0x201] = 0x00;
+        chip8.memory[0x202] = 0xd3;
+        chip8.memory[0x203] = 0x40;
+        assert!(chip8.fetch_op() == (0xf, 0x0, 0x0, 0x0));
+        chip8.pc += 2;
+        assert!(chip8.fetch_op() == (0xd, 0x3, 0x4, 0x0));
     }
 }
