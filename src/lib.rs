@@ -36,7 +36,6 @@ impl Chip8 {
         // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
         // 0xFX15: Set timer = VX (0x01 = 1/60 second)
         // 0xFX18: Set tone duration = VX (0x01 = 1/60 second)
-        // 0xFX1E: Let I = I + VX
         // 0xFX29: Let I = 5 byte display pattern for LSD of VX
         // 0xFX33: Let MI = 3 decimal digit equivalent of VX (I unchanged)
         // 0xFX55: Let MI = V0 : VX (I = I + X + 1)
@@ -151,6 +150,12 @@ impl Chip8 {
                 // 0xAMMM: Let I = 0x0MMM
                 let mmm = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
                 self.i = mmm;
+                self.next();
+            }
+            (0xF, x, 0x1, 0xE) => {
+                // 0xFX1E: Let I = I + VX
+                let vx = self.registers[x as usize];
+                self.i += vx as usize;
                 self.next();
             }
             (a, b, c, d) => {
@@ -418,6 +423,17 @@ mod tests {
         chip8.memory[0x201] = 0x08;
         chip8.cycle();
         assert!(chip8.i == 0x908);
+    }
+
+    #[test]
+    fn op_fx1e() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0xF4;
+        chip8.memory[0x201] = 0x1E;
+        chip8.i = 0x500;
+        chip8.registers[4] = 0x20;
+        chip8.cycle();
+        assert!(chip8.i == 0x500 + 0x20);
     }
 
     #[test]
