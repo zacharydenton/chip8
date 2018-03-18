@@ -235,7 +235,15 @@ impl<'a> Chip8 {
                     let mi = self.memory[self.i + i as usize];
                     for j in 0..8 {
                         let bit = (mi >> (7 - j)) & 1;
-                        let index = 64 * ((vy + i) as usize) + ((vx + j) as usize);
+                        let x = (vx + j) as usize;
+                        if x >= 64 {
+                            continue;
+                        }
+                        let y = (vy + i) as usize;
+                        if y >= 32 {
+                            continue;
+                        }
+                        let index = 64 * y + x;
                         if bit == 1 && self.graphics[index] == 1 {
                             self.registers[0xF] = 0x1;
                         }
