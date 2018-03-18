@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 extern crate rand;
 use rand::Rng;
 
@@ -5,10 +7,14 @@ pub struct Chip8 {
     pub i: usize,
     pub pc: usize,
     pub sp: usize,
+    pub delay_timer: u8,
+    pub sound_timer: u8,
     pub stack: [usize; 32],
     pub registers: [u8; 16],
     pub memory: [u8; 4096],
     pub graphics: [u8; 64 * 32],
+    last_tick: Instant,
+    timer_interval: Duration,
 }
 
 impl<'a> Chip8 {
@@ -17,10 +23,14 @@ impl<'a> Chip8 {
             i: 0,
             pc: 0x200,
             sp: 0,
+            delay_timer: 0,
+            sound_timer: 0,
             registers: [0; 16],
             stack: [0; 32],
             memory: [0; 4096],
             graphics: [0; 64 * 32],
+            last_tick: Instant::now(),
+            timer_interval: Duration::from_secs(1).checked_div(60).unwrap(),
         };
 
         // Initalize fonts at the start of system memory.
@@ -35,6 +45,8 @@ impl<'a> Chip8 {
         self.i = 0;
         self.pc = 0x200;
         self.sp = 0;
+        self.delay_timer = 0;
+        self.sound_timer = 0;
         for i in 0..self.registers.len() {
             self.registers[i] = 0;
         }
@@ -52,9 +64,7 @@ impl<'a> Chip8 {
     pub fn cycle<R: Rng>(&mut self, rng: &'a mut R) {
         // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
         // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
-        // 0xFX07: Let VX = current timer value
         // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
-        // 0xFX15: Set timer = VX (0x01 = 1/60 second)
         // 0xFX18: Set tone duration = VX (0x01 = 1/60 second)
         // 0x0MMM: Do machine language at 0x0MMM (subroutine must end with 0xD4 byte)
         match self.fetch_op() {
@@ -235,12 +245,29 @@ impl<'a> Chip8 {
                 }
                 self.next();
             }
+            (0xF, x, 0x0, 0x7) => {
+                // 0xFX07: Let VX = current timer value
+                self.registers[x as usize] = self.delay_timer;
+                self.next();
+            }
+            (0xF, x, 0x1, 0x5) => {
+                // 0xFX15: Set timer = VX (0x01 = 1/60 second)
+                let vx = self.registers[x as usize];
+                self.delay_timer = vx;
+                self.next();
+            }
             (a, b, c, d) => {
                 panic!(
                     "Attempted to execute unsupported instruction: 0x{:X}{:X}{:X}{:X}",
                     a, b, c, d
                 );
             }
+        }
+
+        if self.last_tick.elapsed() >= self.timer_interval {
+            self.delay_timer = self.delay_timer.saturating_sub(1);
+            self.sound_timer = self.sound_timer.saturating_sub(1);
+            self.last_tick = Instant::now();
         }
     }
 

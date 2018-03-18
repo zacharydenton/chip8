@@ -34,7 +34,6 @@ fn main() {
     let mut program: Vec<u8> = vec![];
     f.read_to_end(&mut program).expect("Error reading program file.");
 
-
     let mut chip8 = Chip8::new();
     chip8.load(&program);
 
