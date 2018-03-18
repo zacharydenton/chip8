@@ -3,9 +3,9 @@ pub struct Chip8 {
     pub sp: usize,
     pub op: u16,
     pub registers: [u8; 16],
-    pub stack: [u8; 32],
     pub memory: [u8; 4096],
     pub graphics: [u8; 64 * 32],
+    pub stack: [usize; 32],
 }
 
 impl Chip8 {
@@ -29,8 +29,6 @@ impl Chip8 {
     }
 
     pub fn cycle(&mut self) {
-        // 0x2MMM: Do subroutine at 0x0MMM (must end with 0x00EE)
-        // 0x00EE: Return from subroutine
         // 0x3XKK: Skip next instruction if VX = KK
         // 0x4XKK: Skip next instruction if VX != KK
         // 0x5XY0: Skip next instruction if VX = VY
@@ -71,6 +69,19 @@ impl Chip8 {
                 let mmm: usize = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
                 let v0: usize = self.registers[0] as usize;
                 self.go_to(mmm + v0);
+            },
+            (0x2, a, b, c) => {
+                // 0x2MMM: Do subroutine at 0x0MMM (must end with 0x00EE)
+                let mmm: usize = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
+                self.stack[self.sp] = self.pc;
+                self.sp += 1;
+                self.go_to(mmm);
+            },
+            (0x0, 0x0, 0xE, 0xE) => {
+                // 0x00EE: Return from subroutine
+                self.sp -= 1;
+                let return_address: usize = self.stack[self.sp] + 2;
+                self.go_to(return_address);
             },
             (a, b, c, d) => {
                 panic!(
@@ -158,11 +169,27 @@ mod tests {
     #[test]
     fn op_bmmm() {
         let mut chip8 = Chip8::new();
-        chip8.memory[0x200] = 0xB1;
+        chip8.memory[0x200] = 0xB3;
         chip8.memory[0x201] = 0x00;
         chip8.registers[0] = 0xF0;
         chip8.cycle();
-        assert!(chip8.pc == 0x100 + 0xF0);
+        assert!(chip8.pc == 0x300 + 0xF0);
+    }
+
+    #[test]
+    fn subroutines() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0x25;
+        chip8.memory[0x201] = 0x00;
+        chip8.memory[0x500] = 0x00;
+        chip8.memory[0x501] = 0xEE;
+        chip8.cycle();
+        assert!(chip8.pc == 0x500);
+        assert!(chip8.sp == 1);
+        assert!(chip8.stack[0] == 0x200);
+        chip8.cycle();
+        assert!(chip8.pc == 0x202);
+        assert!(chip8.sp == 0);
     }
 
     #[test]
