@@ -13,6 +13,7 @@ pub struct Chip8 {
     pub registers: [u8; 16],
     pub memory: [u8; 4096],
     pub graphics: [u8; 64 * 32],
+    pub needs_redraw: bool,
     last_tick: Instant,
     timer_interval: Duration,
 }
@@ -29,6 +30,7 @@ impl<'a> Chip8 {
             stack: [0; 32],
             memory: [0; 4096],
             graphics: [0; 64 * 32],
+            needs_redraw: true,
             last_tick: Instant::now(),
             timer_interval: Duration::from_secs(1).checked_div(60).unwrap(),
         };
@@ -47,6 +49,7 @@ impl<'a> Chip8 {
         self.sp = 0;
         self.delay_timer = 0;
         self.sound_timer = 0;
+        self.needs_redraw = true;
         for i in 0..self.registers.len() {
             self.registers[i] = 0;
         }
@@ -62,10 +65,8 @@ impl<'a> Chip8 {
     }
 
     pub fn cycle<R: Rng>(&mut self, rng: &'a mut R) {
-        // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
-        // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
-        // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
-        // 0x0MMM: Do machine language at 0x0MMM (subroutine must end with 0xD4 byte)
+        self.needs_redraw = false;
+
         match self.fetch_op() {
             (0x1, a, b, c) => {
                 // 0x1MMM: Go to 0x0MMM
@@ -228,6 +229,7 @@ impl<'a> Chip8 {
                 // 0xDXYN: Show n byte MI pattern at VX-VY coordinates. I unchanged. MI pattern is
                 // combined with existing display via EXCLUSIVE-OR function. VF = 0x01 if a 1 in MI
                 // pattern matches 1 in existing display.
+                self.needs_redraw = true;
                 self.registers[0xF] = 0x0;
                 let vx = self.registers[x as usize];
                 let vy = self.registers[y as usize];
@@ -270,6 +272,11 @@ impl<'a> Chip8 {
                 self.next();
             }
             (a, b, c, d) => {
+                // TODO
+                // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
+                // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
+                // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
+                // 0x0MMM: Do machine language at 0x0MMM (subroutine must end with 0xD4 byte)
                 panic!(
                     "Attempted to execute unsupported instruction: 0x{:X}{:X}{:X}{:X}",
                     a, b, c, d

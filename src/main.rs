@@ -44,16 +44,18 @@ fn main() {
 
     let mut closed = false;
     while !closed {
-        let mut framebuffer: Vec<u8> = vec![0; 3 * chip8.graphics.len()];
-        render(&chip8, &mut framebuffer);
+        if chip8.needs_redraw {
+            let mut framebuffer: Vec<u8> = vec![0; 3 * chip8.graphics.len()];
+            render(&chip8, &mut framebuffer);
 
-        let image = glium::texture::RawImage2d::from_raw_rgb(framebuffer, (64, 32));
-        let texture = glium::Texture2d::new(&display, image).unwrap();
-        let surface = texture.as_surface();
+            let image = glium::texture::RawImage2d::from_raw_rgb(framebuffer, (64, 32));
+            let texture = glium::Texture2d::new(&display, image).unwrap();
+            let surface = texture.as_surface();
 
-        let target = display.draw();
-        surface.fill(&target, glium::uniforms::MagnifySamplerFilter::Nearest);
-        target.finish().unwrap();
+            let target = display.draw();
+            surface.fill(&target, glium::uniforms::MagnifySamplerFilter::Nearest);
+            target.finish().unwrap();
+        }
 
         events_loop.poll_events(|ev| match ev {
             glutin::Event::WindowEvent { event, .. } => match event {
