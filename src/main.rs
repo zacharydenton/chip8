@@ -23,19 +23,19 @@ fn render(chip8: &Chip8, framebuffer: &mut [u8]) {
 
 fn main() {
     let mut rng = rand::thread_rng();
+    let mut chip8 = Chip8::new();
 
     let args: Vec<_> = std::env::args().collect();
-    if args.len() != 2 {
-        panic!("usage: {} FILENAME", &args[0]);
+    if args.len() == 2 {
+        let filename = &args[1];
+        let mut f = File::open(filename).expect("Unable to open program file.");
+        let mut program: Vec<u8> = vec![];
+        f.read_to_end(&mut program).expect("Error reading program file.");
+        chip8.load(&program);
+    } else {
+        let logo = include_bytes!("logo.ch8");
+        chip8.load(logo);
     }
-
-    let filename = &args[1];
-    let mut f = File::open(filename).expect("Unable to open program file.");
-    let mut program: Vec<u8> = vec![];
-    f.read_to_end(&mut program).expect("Error reading program file.");
-
-    let mut chip8 = Chip8::new();
-    chip8.load(&program);
 
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new();
