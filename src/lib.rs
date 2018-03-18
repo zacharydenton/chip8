@@ -36,7 +36,6 @@ impl Chip8 {
         // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
         // 0xFX15: Set timer = VX (0x01 = 1/60 second)
         // 0xFX18: Set tone duration = VX (0x01 = 1/60 second)
-        // 0xFX33: Let MI = 3 decimal digit equivalent of VX (I unchanged)
         // 0xFX55: Let MI = V0 : VX (I = I + X + 1)
         // 0xFX65: Let V0 : VX = MI (I = I + X + 1)
         // 0x00E0: Erase display (all 0s)
@@ -162,6 +161,14 @@ impl Chip8 {
                 let vx = self.registers[x as usize];
                 let lsd = vx & 0xF;
                 self.i = 5 * lsd as usize;
+                self.next();
+            }
+            (0xF, x, 0x3, 0x3) => {
+                // 0xFX33: Let MI = 3 decimal digit equivalent of VX (I unchanged)
+                let vx = self.registers[x as usize];
+                self.memory[self.i + 0] = vx / 100;
+                self.memory[self.i + 1] = vx / 10 % 10;
+                self.memory[self.i + 2] = vx % 10;
                 self.next();
             }
             (a, b, c, d) => {
@@ -460,6 +467,31 @@ mod tests {
         for i in 0..5 {
             assert!(chip8.memory[chip8.i + i] == FONTS[(5 * 0x1) + i]);
         }
+    }
+
+    #[test]
+    fn op_fx33() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0xF1;
+        chip8.memory[0x201] = 0x33;
+        chip8.registers[1] = 243;
+        chip8.i = 0x500;
+        chip8.cycle();
+        assert!(chip8.memory[chip8.i + 0] == 2);
+        assert!(chip8.memory[chip8.i + 1] == 4);
+        assert!(chip8.memory[chip8.i + 2] == 3);
+        chip8.pc = 0x200;
+        chip8.registers[1] = 91;
+        chip8.cycle();
+        assert!(chip8.memory[chip8.i + 0] == 0);
+        assert!(chip8.memory[chip8.i + 1] == 9);
+        assert!(chip8.memory[chip8.i + 2] == 1);
+        chip8.pc = 0x200;
+        chip8.registers[1] = 5;
+        chip8.cycle();
+        assert!(chip8.memory[chip8.i + 0] == 0);
+        assert!(chip8.memory[chip8.i + 1] == 0);
+        assert!(chip8.memory[chip8.i + 2] == 5);
     }
 
     #[test]
