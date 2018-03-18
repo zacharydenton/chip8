@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["zach"]
 
 [dependencies]
+glium = "0.20.0"
