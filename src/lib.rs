@@ -32,7 +32,6 @@ impl Chip8 {
         // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
         // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
         // 0xCXKK: Let VX = Random Byte (KK = Mask)
-        // 0x8XY0: Let VX = VY
         // 0x8XY1: Let VX = VX / VY (VF changed)
         // 0x8XY2: Let VX = VX & VY (VF changed)
         // 0x8XY4: Let VX = VX + VY (VF = 0x00 if VX + VY <= 0xFF, VF = 0x01 if VX + VY > 0xFF)
@@ -113,6 +112,12 @@ impl Chip8 {
                 let kk = (a << 4) + b;
                 let vx = self.registers[x as usize];
                 self.registers[x as usize] = vx.wrapping_add(kk);
+                self.next();
+            }
+            (0x8, x, y, 0x0) => {
+                // 0x8XY0: Let VX = VY
+                let vy = self.registers[y as usize];
+                self.registers[x as usize] = vy;
                 self.next();
             }
             (a, b, c, d) => {
@@ -300,6 +305,17 @@ mod tests {
         chip8.memory[0x201] = 0xFF;
         chip8.cycle();
         assert!(chip8.registers[0xA] == 0x10 - 1);
+    }
+
+    #[test]
+    fn op_8xy0() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0x8A;
+        chip8.memory[0x201] = 0xB0;
+        chip8.registers[0xB] = 0xF0;
+        chip8.cycle();
+        assert!(chip8.registers[0xA] == 0xF0);
+        assert!(chip8.registers[0xB] == 0xF0);
     }
 
     #[test]
