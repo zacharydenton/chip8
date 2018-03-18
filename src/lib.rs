@@ -29,7 +29,6 @@ impl Chip8 {
     }
 
     pub fn cycle(&mut self) {
-        // 0x9XY0: Skip next instruction if VX != VY
         // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
         // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
         // 0x6XKK: Let VX = KK
@@ -101,6 +100,14 @@ impl Chip8 {
             (0x5, x, y, 0x0) => {
                 // 0x5XY0: Skip next instruction if VX = VY
                 if self.registers[x as usize] == self.registers[y as usize] {
+                    self.pc += 4;
+                } else {
+                    self.pc += 2;
+                }
+            }
+            (0x9, x, y, 0x0) => {
+                // 0x9XY0: Skip next instruction if VX != VY
+                if self.registers[x as usize] != self.registers[y as usize] {
                     self.pc += 4;
                 } else {
                     self.pc += 2;
@@ -240,6 +247,21 @@ mod tests {
         chip8.registers[0xB] = 0x33;
         chip8.cycle();
         assert!(chip8.pc == 0x204);
+    }
+
+    #[test]
+    fn op_9xy0() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0x9C;
+        chip8.memory[0x201] = 0xA0;
+        chip8.registers[0xC] = 0xFF;
+        chip8.registers[0xA] = 0xEE;
+        chip8.cycle();
+        assert!(chip8.pc == 0x204);
+        chip8.pc = 0x200;
+        chip8.registers[0xA] = 0xFF;
+        chip8.cycle();
+        assert!(chip8.pc == 0x202);
     }
 
     #[test]
