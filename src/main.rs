@@ -1,7 +1,12 @@
+use std::fs::File;
+use std::io::prelude::*;
+
 extern crate chip8;
 use chip8::Chip8;
 
 extern crate glium;
+use glium::{glutin, Surface};
+
 extern crate rand;
 
 fn render(chip8: &Chip8, framebuffer: &mut [u8]) {
@@ -17,36 +22,26 @@ fn render(chip8: &Chip8, framebuffer: &mut [u8]) {
 }
 
 fn main() {
-    use glium::{glutin, Surface};
+    let mut rng = rand::thread_rng();
+
+    let args: Vec<_> = std::env::args().collect();
+    if args.len() != 2 {
+        panic!("usage: {} FILENAME", &args[0]);
+    }
+
+    let filename = &args[1];
+    let mut f = File::open(filename).expect("Unable to open program file.");
+    let mut program: Vec<u8> = vec![];
+    f.read_to_end(&mut program).expect("Error reading program file.");
+
+
+    let mut chip8 = Chip8::new();
+    chip8.load(&program);
 
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new();
     let context = glutin::ContextBuilder::new();
     let display = glium::Display::new(window, context, &events_loop).unwrap();
-
-    let mut rng = rand::thread_rng();
-    let mut chip8 = Chip8::new();
-
-    let program: Vec<u8> = vec![
-      // Set V2 = rocket X coordinate = 0x00;
-      0x62, 0x00,
-      // Set V3 = rocket Y coordinate = 0x00;
-      0x63, 0x00,
-      // Set I = rocket pattern address = 0x020A;
-      0xA2, 0x0A,
-      // Display 6 byte rocket pattern.
-      0xD2, 0x36,
-      // Loop forever (goto 0x208).
-      0x12, 0x08,
-      // Rocket pattern.
-      0x20,
-      0x70,
-      0x70,
-      0xF8,
-      0xD8,
-      0x88,
-    ];
-    chip8.load(&program);
 
     let mut closed = false;
     while !closed {
