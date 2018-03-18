@@ -36,7 +36,6 @@ impl Chip8 {
         // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
         // 0xFX15: Set timer = VX (0x01 = 1/60 second)
         // 0xFX18: Set tone duration = VX (0x01 = 1/60 second)
-        // 0x00E0: Erase display (all 0s)
         // 0xDXYN: Show n byte MI pattern at VX-VY coordinates. I unchanged. MI pattern is combined
         //         with existing display via EXCLUSIVE-OR function. VF = 0x01 if a 1 in MI pattern
         //         matches 1 in existing display.
@@ -182,6 +181,13 @@ impl Chip8 {
                 for i in 0..((x + 1) as usize) {
                     let mx = self.memory[self.i + i];
                     self.registers[i] = mx;
+                }
+                self.next();
+            }
+            (0x0, 0x0, 0xE, 0x0) => {
+                // 0x00E0: Erase display (all 0s)
+                for i in 0..self.graphics.len() {
+                    self.graphics[i] = 0;
                 }
                 self.next();
             }
@@ -535,6 +541,20 @@ mod tests {
         chip8.cycle();
         for i in 0..8 {
             assert!(chip8.registers[i] == 33 + (4 * i as u8));
+        }
+    }
+
+    #[test]
+    fn op_00e0() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0x00;
+        chip8.memory[0x201] = 0xE0;
+        for i in 0..chip8.graphics.len() {
+            chip8.graphics[i] = 1;
+        }
+        chip8.cycle();
+        for i in 0..chip8.graphics.len() {
+            assert!(chip8.graphics[i] == 0);
         }
     }
 
