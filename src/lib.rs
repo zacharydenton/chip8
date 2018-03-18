@@ -220,6 +220,7 @@ impl<'a> Chip8 {
             }
             (0x0, 0x0, 0xE, 0x0) => {
                 // 0x00E0: Erase display (all 0s)
+                self.needs_redraw = true;
                 for i in 0..self.graphics.len() {
                     self.graphics[i] = 0;
                 }
@@ -667,6 +668,7 @@ mod tests {
         for i in 0..chip8.graphics.len() {
             assert!(chip8.graphics[i] == 0);
         }
+        assert!(chip8.needs_redraw);
     }
 
     #[test]
@@ -687,6 +689,7 @@ mod tests {
                 assert!(chip8.graphics[64 * (12 + y) + (10 + x)] == 1);
             }
         }
+        assert!(chip8.needs_redraw);
         assert!(chip8.registers[0xF] == 0);
         chip8.pc = 0x200;
         chip8.cycle(&mut rng);
@@ -695,6 +698,7 @@ mod tests {
                 assert!(chip8.graphics[64 * (12 + y) + (10 + x)] == 0);
             }
         }
+        assert!(chip8.needs_redraw);
         assert!(chip8.registers[0xF] == 1);
         chip8.registers[4] = 18;
         chip8.pc = 0x200;
@@ -704,6 +708,7 @@ mod tests {
                 assert!(chip8.graphics[64 * (12 + y) + (18 + x)] == 1);
             }
         }
+        assert!(chip8.needs_redraw);
         assert!(chip8.registers[0xF] == 0);
     }
 
