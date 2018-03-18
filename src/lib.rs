@@ -1,0 +1,65 @@
+pub struct Chip8 {
+    pub pc: u16,
+    pub op: u16,
+    pub sp: u16,
+    pub registers: [u8; 16],
+    pub stack: [u8; 32],
+    pub memory: [u8; 4096],
+    pub graphics: [u8; 64 * 32],
+}
+
+impl Chip8 {
+    pub fn new() -> Self {
+        let mut chip8 = Chip8 {
+            op: 0,
+            pc: 0x200,
+            sp: 0,
+            registers: [0; 16],
+            stack: [0; 32],
+            memory: [0; 4096],
+            graphics: [0; 64 * 32],
+        };
+
+        // Initalize fonts at the start of system memory.
+        for i in 0..FONTS.len() {
+            chip8.memory[i] = FONTS[i];
+        }
+
+        chip8
+    }
+}
+
+static FONTS: [u8; 80] = [
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_chip8() {
+        let chip8 = Chip8::new();
+        assert!(chip8.memory.len() == 4096);
+        assert!(chip8.stack.len() == 32);
+        assert!(chip8.pc == 0x200);
+        for i in 0..FONTS.len() {
+            assert!(chip8.memory[i] != 0);
+        }
+    }
+}
