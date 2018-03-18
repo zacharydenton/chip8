@@ -32,7 +32,6 @@ impl Chip8 {
         // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
         // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
         // 0xCXKK: Let VX = Random Byte (KK = Mask)
-        // 0x8XY5: Let VX = VX - VY (VF = 0x00 if VX < VY, VF = 0x01 if VX >= VY)
         // 0xFX07: Let VX = current timer value
         // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
         // 0xFX15: Set timer = VX (0x01 = 1/60 second)
@@ -138,6 +137,15 @@ impl Chip8 {
                 let r = vx.wrapping_add(vy);
                 self.registers[x as usize] = r;
                 self.registers[0xF] = if r < vx { 1 } else { 0 };
+                self.next();
+            }
+            (0x8, x, y, 0x5) => {
+                // 0x8XY5: Let VX = VX - VY (VF = 0x00 if VX < VY, VF = 0x01 if VX >= VY)
+                let vx = self.registers[x as usize];
+                let vy = self.registers[y as usize];
+                let r = vx.wrapping_sub(vy);
+                self.registers[x as usize] = r;
+                self.registers[0xF] = if vx < vy { 0 } else { 1 };
                 self.next();
             }
             (a, b, c, d) => {
@@ -375,6 +383,23 @@ mod tests {
         chip8.cycle();
         assert!(chip8.registers[0x3] == (0x39 + 0x0D) - 1);
         assert!(chip8.registers[0xF] == 1);
+    }
+
+    #[test]
+    fn op_8xy5() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0x83;
+        chip8.memory[0x201] = 0x45;
+        chip8.registers[0x3] = 0x39;
+        chip8.registers[0x4] = 0x0D;
+        chip8.cycle();
+        assert!(chip8.registers[0x3] == 0x39 - 0x0D);
+        assert!(chip8.registers[0xF] == 1);
+        chip8.pc = 0x200;
+        chip8.registers[0x4] = 0xFF;
+        chip8.cycle();
+        assert!(chip8.registers[0x3] == (0x39 - 0x0D) + 1);
+        assert!(chip8.registers[0xF] == 0);
     }
 
     #[test]
