@@ -29,7 +29,6 @@ impl Chip8 {
     }
 
     pub fn cycle(&mut self) {
-        // 0xBMMM: Go to 0x0MMM + V0
         // 0x2MMM: Do subroutine at 0x0MMM (must end with 0x00EE)
         // 0x00EE: Return from subroutine
         // 0x3XKK: Skip next instruction if VX = KK
@@ -66,7 +65,13 @@ impl Chip8 {
                 // 0x1MMM: Go to 0x0MMM
                 let mmm: usize = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
                 self.go_to(mmm);
-            }
+            },
+            (0xB, a, b, c) => {
+                // 0xBMMM: Go to 0x0MMM + V0
+                let mmm: usize = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
+                let v0: usize = self.registers[0] as usize;
+                self.go_to(mmm + v0);
+            },
             (a, b, c, d) => {
                 panic!(
                     "Attempted to execute unsupported instruction: 0x{:X}{:X}{:X}{:X}",
@@ -148,6 +153,16 @@ mod tests {
         assert!(chip8.pc == 0x35F);
         chip8.cycle();
         assert!(chip8.pc == 0x200);
+    }
+
+    #[test]
+    fn op_bmmm() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0xB1;
+        chip8.memory[0x201] = 0x00;
+        chip8.registers[0] = 0xF0;
+        chip8.cycle();
+        assert!(chip8.pc == 0x100 + 0xF0);
     }
 
     #[test]
