@@ -36,7 +36,6 @@ impl Chip8 {
         // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
         // 0xFX15: Set timer = VX (0x01 = 1/60 second)
         // 0xFX18: Set tone duration = VX (0x01 = 1/60 second)
-        // 0xFX55: Let MI = V0 : VX (I = I + X + 1)
         // 0xFX65: Let V0 : VX = MI (I = I + X + 1)
         // 0x00E0: Erase display (all 0s)
         // 0xDXYN: Show n byte MI pattern at VX-VY coordinates. I unchanged. MI pattern is combined
@@ -169,6 +168,14 @@ impl Chip8 {
                 self.memory[self.i + 0] = vx / 100;
                 self.memory[self.i + 1] = vx / 10 % 10;
                 self.memory[self.i + 2] = vx % 10;
+                self.next();
+            }
+            (0xF, x, 0x5, 0x5) => {
+                // 0xFX55: Let MI = V0 : VX (I = I + X + 1)
+                for i in 0..((x + 1) as usize) {
+                    let vx = self.registers[i];
+                    self.memory[self.i + i] = vx;
+                }
                 self.next();
             }
             (a, b, c, d) => {
@@ -492,6 +499,21 @@ mod tests {
         assert!(chip8.memory[chip8.i + 0] == 0);
         assert!(chip8.memory[chip8.i + 1] == 0);
         assert!(chip8.memory[chip8.i + 2] == 5);
+    }
+
+    #[test]
+    fn op_fx55() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0xF7;
+        chip8.memory[0x201] = 0x55;
+        for i in 0..8 {
+            chip8.registers[i] = 200 + (i as u8);
+        }
+        chip8.i = 0x450;
+        chip8.cycle();
+        for i in 0..8 {
+            assert!(chip8.memory[0x450 + i] == 200 + (i as u8));
+        }
     }
 
     #[test]
