@@ -29,7 +29,6 @@ impl Chip8 {
     }
 
     pub fn cycle(&mut self) {
-        // 0x3XKK: Skip next instruction if VX = KK
         // 0x4XKK: Skip next instruction if VX != KK
         // 0x5XY0: Skip next instruction if VX = VY
         // 0x9XY0: Skip next instruction if VX != VY
@@ -63,26 +62,35 @@ impl Chip8 {
                 // 0x1MMM: Go to 0x0MMM
                 let mmm: usize = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
                 self.go_to(mmm);
-            },
+            }
             (0xB, a, b, c) => {
                 // 0xBMMM: Go to 0x0MMM + V0
                 let mmm: usize = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
                 let v0: usize = self.registers[0] as usize;
                 self.go_to(mmm + v0);
-            },
+            }
             (0x2, a, b, c) => {
                 // 0x2MMM: Do subroutine at 0x0MMM (must end with 0x00EE)
                 let mmm: usize = ((a as usize) << 8) + ((b as usize) << 4) + (c as usize);
                 self.stack[self.sp] = self.pc;
                 self.sp += 1;
                 self.go_to(mmm);
-            },
+            }
             (0x0, 0x0, 0xE, 0xE) => {
                 // 0x00EE: Return from subroutine
                 self.sp -= 1;
                 let return_address: usize = self.stack[self.sp] + 2;
                 self.go_to(return_address);
-            },
+            }
+            (0x3, x, a, b) => {
+                // 0x3XKK: Skip next instruction if VX = KK
+                let kk = (a << 4) + b;
+                if self.registers[x as usize] == kk {
+                    self.pc += 4;
+                } else {
+                    self.pc += 2;
+                }
+            }
             (a, b, c, d) => {
                 panic!(
                     "Attempted to execute unsupported instruction: 0x{:X}{:X}{:X}{:X}",
@@ -174,6 +182,20 @@ mod tests {
         chip8.registers[0] = 0xF0;
         chip8.cycle();
         assert!(chip8.pc == 0x300 + 0xF0);
+    }
+
+    #[test]
+    fn op_3xkk() {
+        let mut chip8 = Chip8::new();
+        chip8.memory[0x200] = 0x33;
+        chip8.memory[0x201] = 0x42;
+        chip8.registers[3] = 0x41;
+        chip8.cycle();
+        assert!(chip8.pc == 0x202);
+        chip8.pc = 0x200;
+        chip8.registers[3] = 0x42;
+        chip8.cycle();
+        assert!(chip8.pc == 0x204);
     }
 
     #[test]
