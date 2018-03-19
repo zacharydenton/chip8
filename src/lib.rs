@@ -173,17 +173,24 @@ impl<'a> Chip8 {
                 self.next();
             }
             (0x8, x, y, 0x1) => {
-                // 0x8XY1: Let VX = VX | VY (VF changed)
+                // 0x8XY1: Let VX = VX | VY (VF unchanged)
                 let vx = self.registers[x as usize];
                 let vy = self.registers[y as usize];
                 self.registers[x as usize] = vx | vy;
                 self.next();
             }
             (0x8, x, y, 0x2) => {
-                // 0x8XY2: Let VX = VX & VY (VF changed)
+                // 0x8XY2: Let VX = VX & VY (VF unchanged)
                 let vx = self.registers[x as usize];
                 let vy = self.registers[y as usize];
                 self.registers[x as usize] = vx & vy;
+                self.next();
+            }
+            (0x8, x, y, 0x3) => {
+                // 0x8XY3: Let VX = VX ^ VY (VF unchanged)
+                let vx = self.registers[x as usize];
+                let vy = self.registers[y as usize];
+                self.registers[x as usize] = vx ^ vy;
                 self.next();
             }
             (0x8, x, y, 0x4) => {
@@ -202,6 +209,14 @@ impl<'a> Chip8 {
                 let r = vx.wrapping_sub(vy);
                 self.registers[x as usize] = r;
                 self.registers[0xF] = if vx < vy { 0 } else { 1 };
+                self.next();
+            }
+            (0x8, x, y, 0x6) => {
+                // 0x8XY6: Let VX = VY >> 1 (VF = lsb prior to shift)
+                let vy = self.registers[y as usize];
+                let r = vy >> 1;
+                self.registers[x as usize] = r;
+                self.registers[0xF] = vy & 1;
                 self.next();
             }
             (0xC, x, a, b) => {
