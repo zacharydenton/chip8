@@ -21,6 +21,28 @@ fn render(chip8: &Chip8, framebuffer: &mut [u8]) {
     }
 }
 
+fn keymap(scancode: u32) -> Option<u8> {
+    match scancode {
+        2 => Some(0x1),
+        3 => Some(0x2),
+        4 => Some(0x3),
+        5 => Some(0xC),
+        16 => Some(0x4),
+        17 => Some(0x5),
+        18 => Some(0x6),
+        19 => Some(0xD),
+        30 => Some(0x7),
+        31 => Some(0x8),
+        32 => Some(0x9),
+        33 => Some(0xE),
+        44 => Some(0xA),
+        45 => Some(0x0),
+        46 => Some(0xB),
+        47 => Some(0xF),
+        _ => None,
+    }
+}
+
 fn main() {
     let mut rng = rand::thread_rng();
     let mut chip8 = Chip8::new();
@@ -30,7 +52,8 @@ fn main() {
         let filename = &args[1];
         let mut f = File::open(filename).expect("Unable to open program file.");
         let mut program: Vec<u8> = vec![];
-        f.read_to_end(&mut program).expect("Error reading program file.");
+        f.read_to_end(&mut program)
+            .expect("Error reading program file.");
         chip8.load(&program);
     } else {
         let logo = include_bytes!("../data/logo.ch8");
@@ -60,6 +83,17 @@ fn main() {
         events_loop.poll_events(|ev| match ev {
             glutin::Event::WindowEvent { event, .. } => match event {
                 glutin::WindowEvent::Closed => closed = true,
+                glutin::WindowEvent::KeyboardInput { input, .. } => match keymap(input.scancode) {
+                    Some(keycode) => match input.state {
+                        glium::glutin::ElementState::Pressed => {
+                            chip8.key_down(keycode);
+                        }
+                        glium::glutin::ElementState::Released => {
+                            chip8.key_up(keycode);
+                        }
+                    },
+                    None => (),
+                },
                 _ => (),
             },
             _ => (),

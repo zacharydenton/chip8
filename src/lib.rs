@@ -13,7 +13,10 @@ pub struct Chip8 {
     pub registers: [u8; 16],
     pub memory: [u8; 4096],
     pub graphics: [u8; 64 * 32],
+    pub keys: [bool; 16],
     pub needs_redraw: bool,
+    pub needs_input: bool,
+    input_register: usize,
     last_tick: Instant,
     timer_interval: Duration,
 }
@@ -30,7 +33,10 @@ impl<'a> Chip8 {
             stack: [0; 32],
             memory: [0; 4096],
             graphics: [0; 64 * 32],
+            keys: [false; 16],
             needs_redraw: true,
+            needs_input: false,
+            input_register: 0,
             last_tick: Instant::now(),
             timer_interval: Duration::from_secs(1).checked_div(60).unwrap(),
         };
@@ -50,6 +56,8 @@ impl<'a> Chip8 {
         self.delay_timer = 0;
         self.sound_timer = 0;
         self.needs_redraw = true;
+        self.needs_input = false;
+        self.input_register = 0;
         for i in 0..self.registers.len() {
             self.registers[i] = 0;
         }
@@ -62,9 +70,37 @@ impl<'a> Chip8 {
         for i in 0..self.graphics.len() {
             self.graphics[i] = 0;
         }
+        for i in 0..self.keys.len() {
+            self.keys[i] = false;
+        }
     }
 
     pub fn cycle<R: Rng>(&mut self, rng: &'a mut R) {
+        if !self.needs_input {
+            self.execute_op(rng);
+        }
+
+        if self.last_tick.elapsed() >= self.timer_interval {
+            self.delay_timer = self.delay_timer.saturating_sub(1);
+            self.sound_timer = self.sound_timer.saturating_sub(1);
+            self.last_tick = Instant::now();
+        }
+    }
+
+    pub fn key_down(&mut self, keycode: u8) {
+        self.keys[keycode as usize] = true;
+        if self.needs_input {
+            self.registers[self.input_register] = keycode;
+        }
+        self.needs_input = false;
+    }
+
+    pub fn key_up(&mut self, keycode: u8) {
+        self.keys[keycode as usize] = false;
+        self.needs_input = false;
+    }
+
+    fn execute_op<R: Rng>(&mut self, rng: &'a mut R) {
         self.needs_redraw = false;
 
         match self.fetch_op() {
@@ -272,23 +308,33 @@ impl<'a> Chip8 {
                 self.sound_timer = vx;
                 self.next();
             }
+            (0xE, x, 0x9, 0xE) => {
+                // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
+                let vx = self.registers[x as usize];
+                let lsd = vx & 0xF;
+                let key_pressed = self.keys[lsd as usize];
+                self.skip_if(key_pressed);
+            }
+            (0xE, x, 0xA, 0x1) => {
+                // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
+                let vx = self.registers[x as usize];
+                let lsd = vx & 0xF;
+                let key_pressed = self.keys[lsd as usize];
+                self.skip_if(!key_pressed);
+            }
+            (0xF, x, 0x0, 0xA) => {
+                // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
+                self.needs_input = true;
+                self.input_register = x as usize;
+            }
             (a, b, c, d) => {
                 // TODO
-                // 0xEX9E: Skip next instruction if VX = hexadecimal key (LSD)
-                // 0xEXA1: Skip next instruction if VX != hexadecimal key (LSD)
-                // 0xFX0A: Let VX = hexadecimal key digit (waits for any key pressed)
                 // 0x0MMM: Do machine language at 0x0MMM (subroutine must end with 0xD4 byte)
                 panic!(
                     "Attempted to execute unsupported instruction: 0x{:X}{:X}{:X}{:X}",
                     a, b, c, d
                 );
             }
-        }
-
-        if self.last_tick.elapsed() >= self.timer_interval {
-            self.delay_timer = self.delay_timer.saturating_sub(1);
-            self.sound_timer = self.sound_timer.saturating_sub(1);
-            self.last_tick = Instant::now();
         }
     }
 
