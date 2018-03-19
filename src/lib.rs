@@ -91,6 +91,7 @@ impl<'a> Chip8 {
         self.keys[keycode as usize] = true;
         if self.needs_input {
             self.registers[self.input_register] = keycode;
+            self.next();
         }
         self.needs_input = false;
     }
